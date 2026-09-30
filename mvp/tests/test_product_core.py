@@ -39,6 +39,15 @@ def test_json_attributes_are_normalized_and_validated_for_variants(tmp_path):
  else:
   raise AssertionError('malformed variant attributes should be rejected')
  assert crud.get(db, product['id'])['variants'] == []
+def test_variant_payloads_must_be_objects(tmp_path):
+ db = connect(tmp_path / 'variant-payload.db')
+ try:
+  crud.create(db, {'sku': 'BAD-VARIANT', 'name': 'Bad variant', 'variants': ['not an object']})
+ except ValueError as error:
+  assert str(error) == 'each variant must be an object'
+ else:
+  raise AssertionError('non-object variants should be rejected')
+ assert crud.list_products(db)['total'] == 0
 def test_database_initializes_reference_tables(tmp_path):
  db = connect(tmp_path / 'reference.db')
  db.execute("INSERT INTO categories(name) VALUES ('Lighting')")

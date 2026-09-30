@@ -42,14 +42,16 @@ def _product(row, db=None):
 def _encoded_variants(variants):
     if not isinstance(variants, list):
         raise ValueError('variants must be a list')
+    if not all(isinstance(variant, Mapping) for variant in variants):
+        raise ValueError('each variant must be an object')
     encoded = [_encode(variant, VARIANT_ALLOWED) for variant in variants]
     if any(not values.get('name') for values in encoded):
         raise ValueError('variant name is required')
     return encoded
 
 
-def _replace_variants(db, product_id, variants):
-    encoded_variants = _encoded_variants(variants)
+def _replace_variants(db, product_id, encoded_variants):
+    """Replace variants that have already been validated and encoded."""
     db.execute('DELETE FROM variants WHERE product_id=?', (product_id,))
     for values in encoded_variants:
         columns = ['product_id', *values]
