@@ -1,0 +1,1 @@
+Build a lightweight Product Intelligence MVP with FastAPI, SQLite, and vanilla JavaScript. Import products from CSV, search and edit them, calculate basic pricing, and export CSV. Do not use React, microservices, ERP, or CRM.
