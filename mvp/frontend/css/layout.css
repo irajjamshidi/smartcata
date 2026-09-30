@@ -1,0 +1,1 @@
+main{max-width:1280px;margin:auto;padding:28px}header,.toolbar{display:flex;gap:12px;align-items:center;justify-content:space-between}.toolbar{margin:24px 0;justify-content:flex-start}.toolbar input{min-width:300px}.products{display:grid;gap:14px}.grid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}

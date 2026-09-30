@@ -1,0 +1,1 @@
+export function render(items){document.querySelector('#products').innerHTML=items.map(p=>`<article class="card"><div class="meta">${p.brand||'—'} · ${p.category||'—'}</div><h3>${p.name}</h3><div class="meta">SKU: ${p.sku}</div><p class="price">${p.price} ${p.currency}</p></article>`).join('')||'<p>محصولی یافت نشد.</p>'}

@@ -1,0 +1,1 @@
+export const api={list:q=>fetch('/api/products?'+new URLSearchParams(q)).then(r=>r.json()),create:d=>fetch('/api/products',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(d)}).then(r=>r.json()),export:()=>location='/api/export/csv'};
