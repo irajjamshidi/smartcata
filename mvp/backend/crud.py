@@ -1,12 +1,30 @@
 """Small SQLite repository for products and their basic variants."""
+from collections.abc import Mapping
 import json
 
 ALLOWED = {'sku', 'name', 'slug', 'brand', 'category', 'model', 'description', 'status', 'image', 'attributes', 'cost', 'price', 'currency'}
 VARIANT_ALLOWED = {'sku', 'name', 'attributes', 'price', 'status'}
 
+def _encode_attributes(value):
+    """Validate and serialize attributes before they reach SQLite."""
+    if value in (None, ''):
+        return '{}'
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError as error:
+            raise ValueError('attributes must be a JSON object') from error
+    if not isinstance(value, Mapping):
+        raise ValueError('attributes must be a JSON object')
+    return json.dumps(value, ensure_ascii=False)
+
+
 def _encode(data, allowed):
-    return {key: (json.dumps(value, ensure_ascii=False) if key == 'attributes' and not isinstance(value, str) else value)
-            for key, value in data.items() if key in allowed}
+    return {
+        key: _encode_attributes(value) if key == 'attributes' else value
+        for key, value in data.items()
+        if key in allowed
+    }
 
 def _variant_rows(db, product_id):
     rows = db.execute('SELECT variant_id, product_id, sku, name, attributes, price, status FROM variants WHERE product_id=? ORDER BY variant_id', (product_id,)).fetchall()
@@ -21,12 +39,19 @@ def _product(row, db=None):
         product['variants'] = _variant_rows(db, product['id'])
     return product
 
+def _encoded_variants(variants):
+    if not isinstance(variants, list):
+        raise ValueError('variants must be a list')
+    encoded = [_encode(variant, VARIANT_ALLOWED) for variant in variants]
+    if any(not values.get('name') for values in encoded):
+        raise ValueError('variant name is required')
+    return encoded
+
+
 def _replace_variants(db, product_id, variants):
+    encoded_variants = _encoded_variants(variants)
     db.execute('DELETE FROM variants WHERE product_id=?', (product_id,))
-    for variant in variants:
-        values = _encode(variant, VARIANT_ALLOWED)
-        if not values.get('name'):
-            raise ValueError('variant name is required')
+    for values in encoded_variants:
         columns = ['product_id', *values]
         db.execute(f"INSERT INTO variants ({', '.join(columns)}) VALUES ({', '.join('?' for _ in columns)})", [product_id, *values.values()])
 
@@ -34,11 +59,12 @@ def create(db, data):
     data = dict(data)
     variants = data.pop('variants', [])
     fields = _encode(data, ALLOWED)
+    encoded_variants = _encoded_variants(variants)
     if not fields.get('sku') or not fields.get('name'):
         raise ValueError('sku and name are required')
     columns = ', '.join(fields)
     cursor = db.execute(f"INSERT INTO products ({columns}) VALUES ({', '.join('?' for _ in fields)})", list(fields.values()))
-    _replace_variants(db, cursor.lastrowid, variants)
+    _replace_variants(db, cursor.lastrowid, encoded_variants)
     db.commit()
     return get(db, cursor.lastrowid)
 
@@ -61,10 +87,11 @@ def update(db, product_id, data):
     data = dict(data)
     variants = data.pop('variants', None)
     fields = _encode(data, ALLOWED)
+    encoded_variants = _encoded_variants(variants) if variants is not None else None
     if fields:
         db.execute('UPDATE products SET ' + ', '.join(f'{key}=?' for key in fields) + ", updated_at=CURRENT_TIMESTAMP WHERE id=?", [*fields.values(), product_id])
-    if variants is not None and get(db, product_id) is not None:
-        _replace_variants(db, product_id, variants)
+    if encoded_variants is not None and get(db, product_id) is not None:
+        _replace_variants(db, product_id, encoded_variants)
     db.commit()
     return get(db, product_id)
 

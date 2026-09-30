@@ -19,6 +19,26 @@ def test_variants_are_persisted_and_deleted_with_product(tmp_path):
  assert product['variants'][0]['attributes'] == {'kelvin': 3000}
  assert crud.delete(db, product['id'])
  assert db.execute('SELECT count(*) FROM variants').fetchone()[0] == 0
+def test_malformed_attributes_are_rejected_before_writing(tmp_path):
+ db = connect(tmp_path / 'attributes.db')
+ try:
+  crud.create(db, {'sku': 'BAD-1', 'name': 'Bad attributes', 'attributes': 'not json'})
+ except ValueError as error:
+  assert str(error) == 'attributes must be a JSON object'
+ else:
+  raise AssertionError('malformed attributes should be rejected')
+ assert crud.list_products(db)['total'] == 0
+def test_json_attributes_are_normalized_and_validated_for_variants(tmp_path):
+ db = connect(tmp_path / 'variant-attributes.db')
+ product = crud.create(db, {'sku': 'GOOD-1', 'name': 'Good attributes', 'attributes': '{"color":"white"}'})
+ assert product['attributes'] == {'color': 'white'}
+ try:
+  crud.update(db, product['id'], {'variants': [{'name': 'Broken', 'attributes': 'not json'}]})
+ except ValueError as error:
+  assert str(error) == 'attributes must be a JSON object'
+ else:
+  raise AssertionError('malformed variant attributes should be rejected')
+ assert crud.get(db, product['id'])['variants'] == []
 def test_database_initializes_reference_tables(tmp_path):
  db = connect(tmp_path / 'reference.db')
  db.execute("INSERT INTO categories(name) VALUES ('Lighting')")
