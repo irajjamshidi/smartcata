@@ -14,9 +14,15 @@ def list_products(db, search='', brand='', category='', status='', page=1, per_p
     total=db.execute('SELECT count(*) FROM products'+clause,vals).fetchone()[0]
     rows=db.execute('SELECT * FROM products'+clause+' ORDER BY id DESC LIMIT ? OFFSET ?', vals+[per_page,(page-1)*per_page]).fetchall()
     return {'items':[dict(r) for r in rows], 'total':total, 'page':page, 'per_page':per_page}
+def all_products(db):
+    """Return every product for endpoints that must not truncate the catalog."""
+    rows=db.execute('SELECT * FROM products ORDER BY id DESC').fetchall()
+    return [dict(row) for row in rows]
 def update(db, product_id, data):
     fields={k:(json.dumps(v,ensure_ascii=False) if k=='attributes' and not isinstance(v,str) else v) for k,v in data.items() if k in ALLOWED}
     if not fields: return get(db, product_id)
     db.execute('UPDATE products SET '+', '.join(f'{k}=?' for k in fields)+", updated_at=CURRENT_TIMESTAMP WHERE id=?",list(fields.values())+[product_id]); db.commit(); return get(db,product_id)
 def delete(db, product_id):
-    return db.execute('DELETE FROM products WHERE id=?',(product_id,)).rowcount > 0
+    deleted=db.execute('DELETE FROM products WHERE id=?',(product_id,)).rowcount > 0
+    if deleted: db.commit()
+    return deleted
